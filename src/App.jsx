@@ -92,24 +92,56 @@ function ModalAgregarCuenta({onGuardar,onCerrar}) {
   const [limite,setLimite] = useState("");
   const [tasa,setTasa] = useState("");
 
-  const colores = {debito:C.blue,credito:C.purple,ahorro:C.green};
-  const bancos = ["BBVA","Santander","Banamex","HSBC","Banorte","Mercado Pago","Nu","Hey Banco","Otro"];
+  const colores = {debito:C.blue,credito:C.purple,ahorro:C.green,efectivo:C.orange};
+
+  // Bancos con config automática: [label, tipo sugerido, tasa, color especial]
+  const bancosConfig = [
+    {id:"Nu Débito",      label:"Nu",           tipo:"debito",  tasa:"",   color:C.purple},
+    {id:"Nu Crédito",     label:"Nu Crédito",   tipo:"credito", tasa:"",   color:C.purple},
+    {id:"Plata",          label:"Plata",        tipo:"credito", tasa:"",   color:"#C0C0C0"},
+    {id:"Vexi Amex",      label:"Vexi Amex",    tipo:"credito", tasa:"",   color:C.blue},
+    {id:"Revolut",        label:"Revolut",      tipo:"debito",  tasa:"",   color:"#191C1F"},
+    {id:"Revolut Savings",label:"Revolut 💰",   tipo:"ahorro",  tasa:"15", color:"#191C1F"},
+    {id:"Efectivo",       label:"💵 Efectivo",  tipo:"efectivo",tasa:"",   color:C.orange},
+    {id:"BBVA",           label:"BBVA",         tipo:"debito",  tasa:"",   color:C.blue},
+    {id:"Otro",           label:"Otro",         tipo:"debito",  tasa:"",   color:C.teal},
+  ];
+
+  const seleccionarBanco = (cfg) => {
+    setBanco(cfg.id);
+    setTipo(cfg.tipo);
+    if(cfg.tasa) setTasa(cfg.tasa);
+    else setTasa("");
+    // Sugerir nombre automático
+    const nombres = {
+      "Nu Débito":"Nu Débito","Nu Crédito":"Nu Crédito","Plata":"Plata Crédito",
+      "Vexi Amex":"Vexi Amex","Revolut":"Revolut Débito","Revolut Savings":"Revolut Savings",
+      "Efectivo":"Efectivo en mano","BBVA":"BBVA Débito"
+    };
+    if(nombres[cfg.id]) setNombre(nombres[cfg.id]);
+  };
+
+  const cfgActual = bancosConfig.find(b=>b.id===banco);
 
   const guardar = () => {
-    if(!banco||!nombre||!saldo) return;
+    if(!banco||!nombre) return;
+    if(tipo!=="efectivo" && !saldo) return;
     const cuenta = {
       id: Date.now(),
-      tipo, banco, nombre,
-      numero: numero ? `••••${numero.slice(-4)}` : "••••0000",
+      tipo: tipo==="efectivo"?"debito":tipo,
+      esEfectivo: tipo==="efectivo",
+      banco: tipo==="efectivo"?"Efectivo":banco,
+      nombre,
+      numero: tipo==="efectivo"?"en cartera": (numero ? `••••${numero.slice(-4)}` : "••••0000"),
       saldo: parseFloat(saldo)||0,
-      color: colores[tipo],
+      color: cfgActual?.color || colores[tipo] || C.blue,
       ...(tipo==="credito" && { limite: parseFloat(limite)||0, corte:"28", pago:"12" }),
       ...(tipo==="ahorro" && { tasa: parseFloat(tasa)||0 }),
     };
     onGuardar(cuenta);
   };
 
-  const Input = ({label,value,onChange,placeholder,type="text",kbd=false}) => (
+  const Input = ({label,value,onChange,placeholder,type="text"}) => (
     <div style={{marginBottom:12}}>
       <Label size={11} color={C.text3}>{label}</Label>
       <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} type={type}
@@ -117,43 +149,67 @@ function ModalAgregarCuenta({onGuardar,onCerrar}) {
     </div>
   );
 
+  const listo = banco && nombre && (tipo==="efectivo" || saldo);
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"flex-end",zIndex:1000}}>
-      <div style={{background:C.card,borderRadius:"24px 24px 0 0",width:"100%",padding:"24px 20px 48px",maxHeight:"90vh",overflowY:"auto"}}>
+      <div style={{background:C.card,borderRadius:"24px 24px 0 0",width:"100%",padding:"24px 20px 48px",maxHeight:"92vh",overflowY:"auto"}}>
         <div style={{width:40,height:4,background:C.card3,borderRadius:99,margin:"0 auto 20px"}}/>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <p style={{margin:0,fontSize:20,fontWeight:800,color:C.text}}>Agregar cuenta</p>
           <button onClick={onCerrar} style={{background:C.card3,border:"none",borderRadius:99,width:30,height:30,color:C.text,cursor:"pointer",fontSize:16}}>✕</button>
         </div>
 
-        {/* Tipo */}
+        {/* Selección de banco/cuenta */}
         <div style={{marginBottom:16}}>
-          <Label size={11} color={C.text3}>TIPO DE CUENTA</Label>
-          <div style={{display:"flex",gap:8,marginTop:8}}>
-            {[["debito","💳 Débito",C.blue],["credito","💜 Crédito",C.purple],["ahorro","💚 Ahorro",C.green]].map(([t,l,c])=>(
-              <button key={t} onClick={()=>setTipo(t)} style={{flex:1,background:tipo===t?c+"22":C.card2,border:tipo===t?`1.5px solid ${c}`:"1.5px solid transparent",borderRadius:12,padding:"10px 4px",fontSize:12,color:tipo===t?c:C.text2,cursor:"pointer",fontWeight:tipo===t?700:400,fontFamily:"inherit"}}>{l}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* Banco */}
-        <div style={{marginBottom:12}}>
-          <Label size={11} color={C.text3}>BANCO</Label>
+          <Label size={11} color={C.text3}>SELECCIONA TU CUENTA</Label>
           <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:8}}>
-            {bancos.map(b=>(
-              <button key={b} onClick={()=>setBanco(b)} style={{background:banco===b?C.blue+"33":C.card2,border:banco===b?`1.5px solid ${C.blue}`:"1.5px solid transparent",borderRadius:20,padding:"6px 12px",fontSize:13,color:banco===b?C.blue:C.text2,cursor:"pointer",fontWeight:banco===b?700:400,fontFamily:"inherit"}}>{b}</button>
-            ))}
+            {bancosConfig.map(cfg=>{
+              const sel = banco===cfg.id;
+              const col = cfg.color||C.blue;
+              return (
+                <button key={cfg.id} onClick={()=>seleccionarBanco(cfg)}
+                  style={{background:sel?col+"33":C.card2,border:sel?`1.5px solid ${col}`:"1.5px solid transparent",borderRadius:20,padding:"8px 14px",fontSize:13,color:sel?col:C.text2,cursor:"pointer",fontWeight:sel?700:500,fontFamily:"inherit"}}>
+                  {cfg.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <Input label="NOMBRE DE LA CUENTA" value={nombre} onChange={setNombre} placeholder="Ej: Débito nómina"/>
-        <Input label="ÚLTIMOS 4 DÍGITOS (opcional)" value={numero} onChange={setNumero} placeholder="4821" type="number"/>
-        <Input label={tipo==="credito"?"SALDO ACTUAL (deuda)":"SALDO ACTUAL"} value={saldo} onChange={setSaldo} placeholder="0" type="number"/>
-        {tipo==="credito" && <Input label="LÍMITE DE CRÉDITO" value={limite} onChange={setLimite} placeholder="12000" type="number"/>}
-        {tipo==="ahorro" && <Input label="TASA ANUAL (%)" value={tasa} onChange={setTasa} placeholder="10.5" type="number"/>}
+        {/* Tipo (auto-seleccionado pero editable) */}
+        {banco && tipo!=="efectivo" && (
+          <div style={{marginBottom:14}}>
+            <Label size={11} color={C.text3}>TIPO</Label>
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              {[["debito","💳 Débito",C.blue],["credito","💳 Crédito",C.purple],["ahorro","💰 Ahorro",C.green]].map(([t,l,c])=>(
+                <button key={t} onClick={()=>setTipo(t)} style={{flex:1,background:tipo===t?c+"22":C.card2,border:tipo===t?`1.5px solid ${c}`:"1.5px solid transparent",borderRadius:12,padding:"9px 4px",fontSize:12,color:tipo===t?c:C.text2,cursor:"pointer",fontWeight:tipo===t?700:400,fontFamily:"inherit"}}>{l}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
-        <button onClick={guardar} disabled={!banco||!nombre||!saldo}
-          style={{width:"100%",background:(!banco||!nombre||!saldo)?C.card2:"linear-gradient(135deg,#0A84FF,#BF5AF2)",border:"none",borderRadius:14,padding:"16px",fontSize:16,fontWeight:800,color:C.text,cursor:(!banco||!nombre||!saldo)?"default":"pointer",fontFamily:"inherit",marginTop:4}}>
+        {tipo==="efectivo" && (
+          <div style={{background:C.orange+"11",borderRadius:12,padding:"10px 14px",marginBottom:14}}>
+            <p style={{margin:0,fontSize:13,color:C.orange}}>💵 El efectivo se registra como cuenta de débito especial. Puedes actualizar el saldo cuando cambies lo que traes en cartera.</p>
+          </div>
+        )}
+
+        <Input label="NOMBRE DE LA CUENTA" value={nombre} onChange={setNombre} placeholder="Ej: Nu Débito"/>
+        {tipo!=="efectivo" && <Input label="ÚLTIMOS 4 DÍGITOS (opcional)" value={numero} onChange={setNumero} placeholder="4821" type="number"/>}
+        <Input label={tipo==="credito"?"SALDO ACTUAL (lo que debes $)":tipo==="efectivo"?"EFECTIVO EN CARTERA ($)":"SALDO ACTUAL ($)"} value={saldo} onChange={setSaldo} placeholder="0" type="number"/>
+        {tipo==="credito" && <Input label="LÍMITE DE CRÉDITO ($)" value={limite} onChange={setLimite} placeholder="12000" type="number"/>}
+        {tipo==="ahorro" && (
+          <div style={{marginBottom:12}}>
+            <Label size={11} color={C.text3}>TASA ANUAL (%)</Label>
+            <input value={tasa} onChange={e=>setTasa(e.target.value)} placeholder="15" type="number"
+              style={{marginTop:6,background:C.card2,border:"none",borderRadius:12,padding:"13px 14px",fontSize:15,color:C.text,width:"100%",boxSizing:"border-box",outline:"none",fontFamily:"inherit"}}/>
+            {banco==="Revolut Savings" && <Label size={11} color={C.green} style={{marginTop:4}}>✓ Tasa Revolut Savings: 15% anual</Label>}
+          </div>
+        )}
+
+        <button onClick={guardar} disabled={!listo}
+          style={{width:"100%",background:listo?"linear-gradient(135deg,#0A84FF,#BF5AF2)":C.card2,border:"none",borderRadius:14,padding:"16px",fontSize:16,fontWeight:800,color:C.text,cursor:listo?"pointer":"default",fontFamily:"inherit",marginTop:4}}>
           Guardar cuenta
         </button>
       </div>
@@ -222,8 +278,8 @@ function ModalQuickAdd({cuentas,onGuardar,onCerrar}) {
   const [desc,setDesc] = useState("");
   const [cat,setCat] = useState("");
   const [cuentaId,setCuentaId] = useState(cuentas[0]?.id||null);
-  const catsI=["Propinas","Sueldo","Bonos","Venta","Otro ingreso"];
-  const catsG=["Renta","Comida","Transporte","Entretenimiento","Suscripciones","Salud","Pareja","Ropa","Otros"];
+  const catsI=["Propinas","Propinas efectivo","Sueldo","Bonos","Venta","Transferencia","Otro ingreso"];
+  const catsG=["Renta","Comida","Transporte","Entretenimiento","Suscripciones","Salud","Pareja","Ropa","Servicios","Otros"];
   const cats=tipo==="ingreso"?catsI:catsG;
   const guardar=()=>{
     if(!monto||!desc||!cuentaId) return;
@@ -349,7 +405,7 @@ function PantallaInicio({data}) {
   const gastosCat = transacciones.filter(t=>t.tipo==="gasto").reduce((acc,t)=>{acc[t.cat]=(acc[t.cat]||0)+t.monto;return acc;},{});
   const pieData = Object.entries(gastosCat).map(([name,value])=>({name,value}));
   const COLORS=[C.red,C.orange,C.teal,C.purple,C.blue,C.green,C.yellow];
-  const catEmoji={Renta:"🏠",Comida:"🍴",Transporte:"🚇",Entretenimiento:"🎉",Suscripciones:"📱",Salud:"💊",Propinas:"💰",Sueldo:"💼",Bonos:"🎯",Pareja:"💑",Ropa:"👕"};
+  const catEmoji={Renta:"🏠",Comida:"🍴",Transporte:"🚇",Entretenimiento:"🎉",Suscripciones:"📱",Salud:"💊",Propinas:"💰","Propinas efectivo":"💵",Sueldo:"💼",Bonos:"🎯",Pareja:"💑",Ropa:"👕",Venta:"🛍️",Transferencia:"↔️",Servicios:"🔧"};
   const hora = new Date().getHours();
   const saludo = hora<12?"Buenos días":"hora<19"?"Buenas tardes":"Buenas noches";
 
