@@ -407,8 +407,63 @@ function ModalEstado({cuenta,onCerrar}) {
   );
 }
 
-// ─── INICIO ──────────────────────────────────────────────────────────────────
-function PantallaInicio({data}) {
+// ─── SWIPE TO DELETE ─────────────────────────────────────────────────────────
+function SwipeRow({children,onDelete}) {
+  const [offset,setOffset] = useState(0);
+  const [deleting,setDeleting] = useState(false);
+  const startX = useRef(null);
+  const THRESHOLD = 72;
+
+  const onTouchStart = (e) => { startX.current = e.touches[0].clientX; };
+  const onTouchMove  = (e) => {
+    if(startX.current===null) return;
+    const dx = e.touches[0].clientX - startX.current;
+    if(dx < 0) setOffset(Math.max(dx, -THRESHOLD));
+  };
+  const onTouchEnd = () => {
+    if(offset < -THRESHOLD/2) setOffset(-THRESHOLD);
+    else setOffset(0);
+    startX.current = null;
+  };
+
+  const handleDelete = () => {
+    setDeleting(true);
+    setTimeout(()=>onDelete(), 280);
+  };
+
+  return (
+    <div style={{position:"relative",overflow:"hidden",borderRadius:12,
+      maxHeight: deleting ? 0 : 200,
+      opacity: deleting ? 0 : 1,
+      transition: deleting ? "max-height 0.28s ease, opacity 0.28s ease" : "none"
+    }}>
+      {/* Botón rojo de fondo */}
+      <div style={{position:"absolute",right:0,top:0,bottom:0,width:THRESHOLD,
+        background:C.red,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12}}>
+        <button onClick={handleDelete} style={{background:"transparent",border:"none",cursor:"pointer",
+          display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 16px"}}>
+          <span style={{fontSize:18}}>🗑️</span>
+          <span style={{fontSize:10,color:"#fff",fontWeight:600}}>Borrar</span>
+        </button>
+      </div>
+      {/* Contenido deslizable */}
+      <div
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{transform:`translateX(${offset}px)`,
+          transition: startX.current===null ? "transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)" : "none",
+          background:C.card, borderRadius:12, position:"relative", zIndex:1
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+
+function PantallaInicio({data,onEliminar}) {
   const {nombre,cuentas,transacciones,historial} = data;
   const saldoTotal = cuentas.filter(c=>c.tipo!=="credito").reduce((a,c)=>a+c.saldo,0);
   const mes = historial[historial.length-1]||{ingresos:0,gastos:0,mes:""};
@@ -507,10 +562,11 @@ function PantallaInicio({data}) {
           <Card>
             <Label size={13}>Movimientos recientes</Label>
             <div style={{marginTop:8}}>
-              {recientes.map((t,i)=>(
-                <div key={t.id}>
+          {recientes.map((t,i)=>(
+              <SwipeRow key={t.id} onDelete={()=>onEliminar(t.id)}>
+                <div>
                   {i>0&&<Divider/>}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0"}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <div style={{width:36,height:36,borderRadius:11,background:C.card2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17}}>{catEmoji[t.cat]||"💸"}</div>
                       <div><p style={{margin:0,fontSize:14,fontWeight:600,color:C.text}}>{t.desc}</p><p style={{margin:0,fontSize:11,color:C.text3}}>{t.fecha.slice(5).replace("-","/")} · {t.cat}</p></div>
@@ -518,6 +574,7 @@ function PantallaInicio({data}) {
                     <p style={{margin:0,fontSize:14,fontWeight:700,color:t.tipo==="ingreso"?C.green:C.red}}>{t.tipo==="ingreso"?"+":"-"}{fmt(t.monto)}</p>
                   </div>
                 </div>
+              </SwipeRow>
               ))}
             </div>
           </Card>
@@ -833,7 +890,23 @@ export default function App() {
     setShowAdd(false);
   };
 
-  const agregarCuenta = (cuenta) => {
+  const eliminarMovimiento = (id) => {
+    setData(d => {
+      const mov = d.transacciones.find(t=>t.id===id);
+      if(!mov) return d;
+      return {
+        ...d,
+        transacciones: d.transacciones.filter(t=>t.id!==id),
+        cuentas: d.cuentas.map(c=>c.id!==mov.cuenta?c:{...c,
+          saldo: c.saldo + (mov.tipo==="ingreso" ? -mov.monto : mov.monto)
+        }),
+        historial: d.historial.map((h,i)=>i!==d.historial.length-1?h:{...h,
+          ingresos: mov.tipo==="ingreso" ? Math.max(0,h.ingresos-mov.monto) : h.ingresos,
+          gastos:   mov.tipo==="gasto"   ? Math.max(0,h.gastos-mov.monto)   : h.gastos,
+        })
+      };
+    });
+  };
     setData(d=>({...d,cuentas:[...d.cuentas,cuenta]}));
     setShowAddCuenta(false);
   };
@@ -853,7 +926,7 @@ export default function App() {
 
   return (
     <div style={{background:C.bg,minHeight:"100vh",maxWidth:430,margin:"0 auto",fontFamily:"-apple-system,'SF Pro Display',BlinkMacSystemFont,sans-serif",position:"relative"}}>
-      {tab==="inicio"&&<PantallaInicio data={data}/>}
+      {tab==="inicio"&&<PantallaInicio data={data} onEliminar={eliminarMovimiento}/>}
       {tab==="tarjetas"&&<PantallaTarjetas data={data} onCargarEstado={setCuentaEstado} onAgregarCuenta={()=>setShowAddCuenta(true)}/>}
       {tab==="metas"&&<PantallaMetas data={data} onAgregarMeta={()=>setShowAddMeta(true)}/>}
       {tab==="analisis"&&<PantallaAnalisis data={data}/>}
