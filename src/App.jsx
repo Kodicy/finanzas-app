@@ -309,9 +309,21 @@ function ModalQuickAdd({cuentas,onGuardar,onCerrar}) {
           style={{background:C.card2,border:"none",borderRadius:12,padding:"14px 16px",fontSize:15,color:C.text,width:"100%",boxSizing:"border-box",outline:"none",marginBottom:12,fontFamily:"inherit"}}/>
         <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
           {cats.map(c=>(
-            <button key={c} onClick={()=>setCat(c)} style={{background:cat===c?C.blue+"33":C.card2,border:cat===c?`1.5px solid ${C.blue}`:"1.5px solid transparent",borderRadius:20,padding:"6px 12px",fontSize:13,color:cat===c?C.blue:C.text2,cursor:"pointer",fontWeight:cat===c?700:400,fontFamily:"inherit"}}>{c}</button>
+            <button key={c} onClick={()=>{
+              setCat(c);
+              // Si elige "Propinas efectivo", auto-selecciona la cuenta de efectivo
+              if(c==="Propinas efectivo"){
+                const ctaEfectivo = cuentas.find(cu=>cu.esEfectivo || cu.banco==="Efectivo");
+                if(ctaEfectivo) setCuentaId(ctaEfectivo.id);
+              }
+            }} style={{background:cat===c?C.blue+"33":C.card2,border:cat===c?`1.5px solid ${C.blue}`:"1.5px solid transparent",borderRadius:20,padding:"6px 12px",fontSize:13,color:cat===c?C.blue:C.text2,cursor:"pointer",fontWeight:cat===c?700:400,fontFamily:"inherit"}}>{c}</button>
           ))}
         </div>
+        {cat==="Propinas efectivo" && cuentas.find(c=>c.esEfectivo||c.banco==="Efectivo") && (
+          <div style={{background:C.orange+"11",borderRadius:10,padding:"8px 12px",marginBottom:8,marginTop:-4}}>
+            <Label size={12} color={C.orange}>💵 Sumando a tu cuenta de Efectivo automáticamente</Label>
+          </div>
+        )}
         {cuentas.length > 0 ? (
           <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
             {cuentas.filter(c=>c.tipo!=="ahorro").map(c=>(
