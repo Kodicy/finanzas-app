@@ -907,6 +907,7 @@ export default function App() {
       };
     });
   };
+  const agregarCuenta = (cuenta) => {
     setData(d=>({...d,cuentas:[...d.cuentas,cuenta]}));
     setShowAddCuenta(false);
   };
